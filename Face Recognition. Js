@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head><meta charset="utf-8">
+
+	<title>object detection- TensorFlow.js</title>	<meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><!-- Import the webpage's stylesheet -->
+
+	<link href="facestyle.css" rel="stylesheet" />
+
+</head>
+
+<body>
+
+<h1>Face Recognition With Speech synthetic&nbsp;</h1>
+
+<p id="status">Awaiting TF.js load</p>
+
+<p>
+
+<video autoplay="" id="webcam"></video>
+
+<button id="enableCam">Enable Webcam</button><button class="dataCollector" data-1hot="0" data-name="DwayneJohnson">Dwayne johson</button><button class="dataCollector" data-1hot="1" data-name="JustinBieber">justin Bieber</button><button class="dataCollector" data-1hot="2" data-name="Beyoncé">Beyonce</button><button class="dataCollector" data-1hot="3" data-name="KimKardashian">Kim kardashian</button><button class="dataCollector" data-1hot="4" data-name="WillSmith">will simith</button><button id="train">Train &amp; Predict!</button><button id="reset">Reset</button><!-- Import TensorFlow.js library --><script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js" type="text/javascript"></script>
+
+<style type="text/css">/**
+
+ * @license
+
+ * Copyright 2018 Google LLC. All Rights Reserved.
+
+ * Licensed under the Apache License, Version 2.0 (the "License");
+
+ * you may not use this file except in compliance with the License.
+
+ * You may obtain a copy of the License at
+
+ *
+
+ * http://www.apache.org/licenses/LICENSE-2.0
+
+ *
+
+ * Unless required by applicable law or agreed to in writing, software
+
+ * distributed under the License is distributed on an "AS IS" BASIS,
+
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+ * See the License for the specific language governing permissions and
+
+ * limitations under the License.
+
+ * =============================================================================
+
+ */
+
+/* CSS files add styling rules to your content */
+
+/* Apply a reset */
+
+* {
+
+  margin: 0;
+
+  padding: 0;
+
+  box-sizing: border-box;
+
+}
+
+/* Set global font properties */
+
+html {
+
+  font-size: 62.5%;
+
+}
+
+body {
+
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  font-size: 1.6rem;
+
+  line-height: 1.4;
+
+  margin: 0;
+
+  padding: 0;
+
+}
+
+/* Set the background color */
+
+body {
+
+  background-color: #f5f5f5;
+
+}
+
+/* Set the heading style */
+
+h3 {
+
+  font-size: 2.4rem;
+
+  font-style: italic;
+
+  color: #ff6f00;
+
+  margin: 2rem 0;
+
+}
+
+/* Set the paragraph style */
+
+p {
+
+  font-size: 1.6rem;
+
+  margin-bottom: 1rem;
+
+}
+
+/* Set the button styles */
+
+button {
+
+  padding: 1.6rem 2.4rem;
+
+  margin: 1rem 0;
+
+  border-radius: 4px;
+
+  border: none;
+
+  background-color: #4caf50;
+
+  color: #fff;
+
+  font-size: 1.6rem;
+
+  font-weight: 500;
+
+  cursor: pointer;
+
+  transition: background-color 0.3s ease;
+
+}
+
+/* Set the button hover state */
+
+button:hover {
+
+  background-color: #3e8e41;
+
+}
+
+/* Set the video styles */
+
+video {
+
+  max-width: 100%;
+
+  height: auto;
+
+  display: block;
+
+  margin: 2rem auto;
+
+}
+
+/* Set the ordered list styles */
+
+ol {
+
+  font-size: 1.6rem;
+
+  margin: 2rem 0;
+
+}
+
+ol li {
+
+  margin-bottom: 1rem;
+
+}
+
+/* Set the status paragraph style */
+
+#status {
+
+  font-size: 2rem;
+
+  font-weight: 500;
+
+  margin-bottom: 2rem;
+
+}
+
+/* Set the data collector button styles */
+
+.dataCollector {
+
+  background-color: #2196f3;
+
+}
+
+/* Set the reset button style */
+
+#reset {
+
+  background-color: #f44336;
+
+}
+
+/* Set the train button style */
+
+#train {
+
+  background-color: #009688;
+
+}
+
+/* Add responsive design for small screens */
+
+@media only screen and (max-width: 600px) {
+
+  h3 {
+
+    font-size: 2rem;
+
+  }
+
+  button {
+
+    width: 100%;
+
+  }
+
+}
+
+ h1 {
+
+  font-size: 2.5rem;
+
+  font-weight: bold;
+
+  text-align: center;
+
+}
+
+#status {
+
+  font-size: 1.2rem;
+
+  font-style: italic;
+
+  text-align: center;
+
+  margin-top: 1rem;
+
+}
+
+</style>
+
+<!-- Import the page's JavaScript to do some stuff --><script type="module" src="facescript.js"></script><script >
+
+      /**
+
+ * @license
+
+ * Copyright 2018 Google LLC. All Rights Reserved.
+
+ * Licensed under the Apache License, Version 2.0 (the "License");
+
+ * you may not use this file except in compliance with the License.
+
+ * You may obtain a copy of the License at
+
+ *
+
+ * http://www.apache.org/licenses/LICENSE-2.0
+
+ *
+
+ * Unless required by applicable law or agreed to in writing, software
+
+ * distributed under the License is distributed on an "AS IS" BASIS,
+
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+ * See the License for the specific language governing permissions and
+
+ * limitations under the License.
+
+ * =============================================================================
+
+ */
+
+const STATUS = document.getElementById('status');
+
+const VIDEO = document.getElementById('webcam');
+
+const ENABLE_CAM_BUTTON = document.getElementById('enableCam');
+
+const RESET_BUTTON = document.getElementById('reset');
+
+const TRAIN_BUTTON = document.getElementById('train');
+
+const MOBILE_NET_INPUT_WIDTH = 224;
+
+const MOBILE_NET_INPUT_HEIGHT = 224;
+
+const STOP_DATA_GATHER = -1;
+
+const CLASS_NAMES = [];
+
+ENABLE_CAM_BUTTON.addEventListener('click', enableCam);
+
+TRAIN_BUTTON.addEventListener('click', trainAndPredict);
+
+RESET_BUTTON.addEventListener('click', reset);
+
+// Just add more buttons in HTML to allow classification of more classes of data!
+
+let dataCollectorButtons = document.querySelectorAll('button.dataCollector');
+
+for (let i = 0; i < dataCollectorButtons.length; i++) {
+
+  dataCollectorButtons[i].addEventListener('click', gatherDataForClass);
+
+  //dataCollectorButtons[i].addEventListener('mouseup', gatherDataForClass);
+
+  // For mobile.
+
+  dataCollectorButtons[i].addEventListener('touchend', gatherDataForClass);
+
+  // Populate the human readable names for classes.
+
+  CLASS_NAMES.push(dataCollectorButtons[i].getAttribute('data-name'));
+
+}
+
+let mobilenet = undefined;
+
+let gatherDataState = STOP_DATA_GATHER;
+
+let videoPlaying = false;
+
+let trainingDataInputs = [];
+
+let trainingDataOutputs = [];
+
+let examplesCount = [];
+
+let predict = false;
+
+/**
+
+ * Loads the MobileNet model and warms it up so ready for use.
+
+ **/
+
+async function loadMobileNetFeatureModel() {
+
+  const URL = 'https://tfhub.dev/google/tfjs-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/default/1';
+
+  mobilenet = await tf.loadGraphModel(URL, {fromTFHub: true});
+
+  STATUS.innerText = 'MobileNet v3 loaded successfully!';
+
+  
+
+  // Warm up the model by passing zeros through it once.
+
+  tf.tidy(function () {
+
+    let answer = mobilenet.predict(tf.zeros([1, MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH, 3]));
+
+    console.log(answer.shape);
+
+  });
+
+}
+
+loadMobileNetFeatureModel();
+
+let model = tf.sequential();
+
+model.add(tf.layers.dense({inputShape: [1024], units: 128, activation: 'relu'}));
+
+model.add(tf.layers.dense({units: CLASS_NAMES.length, activation: 'softmax'}));
+
+model.summary();
+
+// Compile the model with the defined optimizer and specify a loss function to use.
+
+model.compile({
+
+  // Adam changes the learning rate over time which is useful.
+
+  optimizer: 'adam',
+
+  // Use the correct loss function. If 2 classes of data, must use binaryCrossentropy.
+
+  // Else categoricalCrossentropy is used if more than 2 classes.
+
+  loss: (CLASS_NAMES.length === 4) ? 'binaryCrossentropy': 'categoricalCrossentropy', 
+
+  // As this is a classification problem you can record accuracy in the logs too!
+
+  metrics: ['accuracy']  
+
+});
+
+/**
+
+ * Check if getUserMedia is supported for webcam access.
+
+ **/
+
+function hasGetUserMedia() {
+
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+}
+
+/**
+
+ * Enable the webcam with video constraints applied.
+
+ **/
+
+function enableCam() {
+
+  if (hasGetUserMedia()) {
+
+    // getUsermedia parameters.
+
+    const constraints = {
+
+      video: true,
+
+      width: 380, 
+
+      height: 380 
+
+    };
+
+    // Activate the webcam stream.
+
+    navigator.mediaDevices.getUserMedia(constraints).then(function(stream) {
+
+      VIDEO.srcObject = stream;
+
+      VIDEO.addEventListener('loadeddata', function() {
+
+        videoPlaying = true;
+
+        ENABLE_CAM_BUTTON.classList.add('removed');
+
+      });
+
+    });
+
+  } else {
+
+    console.warn('getUserMedia() is not supported by your browser');
+
+  }
+
+}
+
+/**
+
+ * Handle Data Gather for button mouseup/mousedown.
+
+ **/
+
+function gatherDataForClass() {
+
+  let classNumber = parseInt(this.getAttribute('data-1hot'));
+
+  gatherDataState = (gatherDataState === STOP_DATA_GATHER) ? classNumber : STOP_DATA_GATHER;
+
+  dataGatherLoop();
+
+}
+
+function calculateFeaturesOnCurrentFrame() {
+
+  return tf.tidy(function() {
+
+    // Grab pixels from current VIDEO frame.
+
+    let videoFrameAsTensor = tf.browser.fromPixels(VIDEO);
+
+    // Resize video frame tensor to be 224 x 224 pixels which is needed by MobileNet for input.
+
+    let resizedTensorFrame = tf.image.resizeBilinear(
+
+        videoFrameAsTensor, 
+
+        [MOBILE_NET_INPUT_HEIGHT, MOBILE_NET_INPUT_WIDTH],
+
+        true
+
+    );
+
+    let normalizedTensorFrame = resizedTensorFrame.div(255);
+
+    return mobilenet.predict(normalizedTensorFrame.expandDims()).squeeze();
+
+  });
+
+}
+
+/**
+
+ * When a button used to gather data is pressed, record feature vectors along with class type to arrays.
+
+ **/
+
+function dataGatherLoop() {
+
+  // Only gather data if webcam is on and a relevent button is pressed.
+
+  if (videoPlaying && gatherDataState !== STOP_DATA_GATHER) {
+
+    // Ensure tensors are cleaned up.
+
+    let imageFeatures = calculateFeaturesOnCurrentFrame();
+
+    trainingDataInputs.push(imageFeatures);
+
+    trainingDataOutputs.push(gatherDataState);
+
+    
+
+    // Intialize array index element if currently undefined.
+
+    if (examplesCount[gatherDataState] === undefined) {
+
+      examplesCount[gatherDataState] = 0;
+
+    }
+
+    // Increment counts of examples for user interface to show.
+
+    examplesCount[gatherDataState]++;
+
+    STATUS.innerText = '';
+
+    for (let n = 0; n < CLASS_NAMES.length; n++) {
+
+      STATUS.innerText += CLASS_NAMES[n] + ' data count: ' + examplesCount[n] + '. ';
+
+    }
+
+    window.requestAnimationFrame(dataGatherLoop);
+
+  }
+
+}
+
+/**
+
+ * Once data collected actually perform the transfer learning.
+
+ **/
+
+async function trainAndPredict() {
+
+  predict = false;
+
+  tf.util.shuffleCombo(trainingDataInputs, trainingDataOutputs);
+
+  let outputsAsTensor = tf.tensor1d(trainingDataOutputs, 'int32');
+
+  let oneHotOutputs = tf.oneHot(outputsAsTensor, CLASS_NAMES.length);
+
+  let inputsAsTensor = tf.stack(trainingDataInputs);
+
+  
+
+  let results = await model.fit(inputsAsTensor, oneHotOutputs, {
+
+    shuffle: true,
+
+    batchSize: 5,
+
+    epochs: 10,
+
+    callbacks: {onEpochEnd: logProgress}
+
+  });
+
+  
+
+  outputsAsTensor.dispose();
+
+  oneHotOutputs.dispose();
+
+  inputsAsTensor.dispose();
+
+  
+
+  predict = true;
+
+  predictLoop();
+
+}
+
+/**
+
+ * Log training progress.
+
+ **/
+
+function logProgress(epoch, logs) {
+
+  console.log('Data for epoch ' + epoch, logs);
+
+}
+
+/**
+
+ * Make live predictions from webcam once trained.
+
+ **/
+
+var obj_details = {
+
+   DwayneJohnson: "This is Dwayne Johnson",
+
+   JustinBieber: "This is a Justin Bieber",
+
+   Beyoncé: "This is a Beyoncé",
+
+   KimKardashian: "This is a  Kim Kardashian",
+
+   WillSmith: "This is a Will Smith"
+
+}
+
+let last_word = "";
+
+let last_spoken_object = "";
+
+function predictLoop() {
+
+    if (predict) {
+
+        tf.tidy(function() {
+
+            let imageFeatures = calculateFeaturesOnCurrentFrame();
+
+            let prediction = model.predict(imageFeatures.expandDims()).squeeze();
+
+            let highestIndex = prediction.argMax().arraySync();
+
+            let predictionArray = prediction.arraySync();
+
+            let name = CLASS_NAMES[highestIndex];
+
+            let content = 'Prediction: ' + name + ' with ' + Math.floor(predictionArray[highestIndex] * 100) + '% confidence <br> Object details: ' + obj_details[name.toLowerCase()];
+
+            STATUS.innerHTML = content;
+
+            if (name !== last_spoken_object) {
+
+                speak(name);
+
+                last_spoken_object = name;
+
+            }
+
+        });
+
+        window.requestAnimationFrame(predictLoop);
+
+    }
+
+}
+
+/**
+
+ * Purge data and start over. Note this does not dispose of the loaded 
+
+ * MobileNet model and MLP head tensors as you will need to reuse 
+
+ * them to train a new model.
+
+ **/
+
+function reset() {
+
+  predict = false;
+
+  examplesCount.splice(0);
+
+  for (let i = 0; i < trainingDataInputs.length; i++) {
+
+    trainingDataInputs[i].dispose();
+
+  }
+
+  trainingDataInputs.splice(0);
+
+  trainingDataOutputs.splice(0);
+
+  STATUS.innerText = 'No data collected';
+
+  
+
+  console.log('Tensors in memory: ' + tf.memory().numTensors);
+
+}
+
+const synth = window.speechSynthesis;
+
+const speak = (text) => {
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  synth.speak(utterance);
+
+}
+
+/**
+
+ * Save the trained model and training data to localStorage.
+
+ */
+
+function saveModel() {
+
+  // Save the trained model to localStorage.
+
+  const modelJSON = model.toJSON();
+
+  localStorage.setItem('model', JSON.stringify(modelJSON));
+
+  // Save the training data to localStorage.
+
+  const trainingData = {
+
+    inputs: trainingDataInputs,
+
+    outputs: trainingDataOutputs,
+
+    examplesCount: examplesCount
+
+  };
+
+  localStorage.setItem('trainingData', JSON.stringify(trainingData));
+
+}
+
+/**
+
+ * Load the trained model and training data from localStorage.
+
+ */
+
+async function loadModel() {
+
+  // Load the trained model from localStorage.
+
+  const modelJSON = JSON.parse(localStorage.getItem('model'));
+
+  model = await tf.loadLayersModel(tf.io.fromJSON(modelJSON));
+
+  // Load the training data from localStorage.
+
+  const trainingData = JSON.parse(localStorage.getItem('trainingData'));
+
+  trainingDataInputs = trainingData.inputs;
+
+  trainingDataOutputs = trainingData.outputs;
+
+  examplesCount = trainingData.examplesCount;
+
+}
+
+</script >
+
+      
+
+      
+
+  </body>
+
+</html></p>
+
+</body>
+
+</html>
